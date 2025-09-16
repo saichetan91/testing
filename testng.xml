@@ -1,0 +1,9 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="Full Automation Suite">
+    <test name="Signup and KYC Flows">
+        <classes>
+            <class name="flows.SignupFlow"/>
+            <class name="flows.KycFlow"/>
+        </classes>
+    </test>
+</suite>
