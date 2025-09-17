@@ -2,6 +2,7 @@
 
 package flows;
 
+import common.HeaderHelper;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.testng.Assert;
@@ -140,26 +141,49 @@ public class KycFlow extends ApiBaseTest {
     @Test(priority = 5, dependsOnMethods = {"testAadhaarVerification"})
     public void testBankAndAccreditation() {
         // Step 1: Submit Bank Details
-        String bankVerifyUrl = "/v2/user/bank/verify";
+        String bankDetailsUrl = "/v2/user/bank-details";
 
-        // FIX: Added 'confirmAccountNumber' to the request body
-        String bankRequestBody = String.format("{\"accountNumber\": \"%s\", \"confirmAccountNumber\": \"%s\", \"ifscCode\": \"%s\"}", bankAccountNumber, bankAccountNumber, ifscCode);
+        String bankRequestBody = String.format("{\"accountNumber\": \"%s\", \"confirmAccountNumber\": \"%s\", \"ifscCode\": \"%s\"}",
+                bankAccountNumber, bankAccountNumber, ifscCode);
 
         Response bankResponse = RestAssured.given()
-                .header("Authorization", "Bearer " + authToken)
-                .header("X-Tap-Session", tapSessionId)
-                .header("X-Device-Id", deviceId)
-                .header("X-Tap-Dshan", tapDshan)
-                .header("_session", sessionCookie)
-                .header("X-Tap-Auth", tapAuth) // FIX: Added X-Tap-Auth header
+                .headers(commonHeaders)
+                .header("X-Platform-Request", "WEB_WRITE")
+                .header("X-Tap-Auth", ApiBaseTest.authToken)
+                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
+                .header("X-Device-Id", ApiBaseTest.deviceId)
+                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
+                .cookie("_session", ApiBaseTest.sessionCookie)
                 .body(bankRequestBody)
                 .log().all()
-                .post(bankVerifyUrl);
+                .post(bankDetailsUrl);
 
         bankResponse.then().log().all();
-        Assert.assertEquals(bankResponse.getStatusCode(), 200, "Bank verification failed.");
+        Assert.assertEquals(bankResponse.getStatusCode(), 200, "Bank details submission failed.");
+
+        // Step 2: Get Accreditation Info (GET request)
+        String getAccreditationUrl = "/v2/user/get-accreditation";
+
+        Response getAccreditationResponse = RestAssured.given()
+                .headers(commonHeaders)
+                .header("X-Platform-Request", "WEB_READ")
+                .header("X-Tap-Auth", ApiBaseTest.authToken)
+                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
+                .header("X-Device-Id", ApiBaseTest.deviceId)
+                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
+                .cookie("_session", ApiBaseTest.sessionCookie)
+                .log().all()
+                .get(getAccreditationUrl);
+
+        getAccreditationResponse.then().log().all();
+        if (getAccreditationResponse.getStatusCode() != 200) {
+            System.out.println("Get Accreditation non-200 status: " + getAccreditationResponse.getStatusCode());
+        }
+
+        // Step 3: Submit Accreditation
         String accreditationUrl = "/v2/user/accreditation";
-        String accreditationBody = String.format("{\"investingAs\": \"%s\", \"netWorth\": \"%s\", \"investmentPlan\": \"%s\"}", investingAs, netWorth, investmentPlan);
+        String accreditationBody = String.format("{\"investingAs\": \"%s\", \"netWorth\": \"%s\", \"investmentPlan\": \"%s\"}",
+                investingAs, netWorth, investmentPlan);
 
         Response accreditationResponse = RestAssured.given()
                 .headers(commonHeaders)
@@ -177,6 +201,7 @@ public class KycFlow extends ApiBaseTest {
             System.out.println("Accreditation non-200 status: " + accreditationResponse.getStatusCode() + "; continuing with KYC flow");
         }
 
+        // Step 4: Compliance
         String complianceUrl = "/v2/user/compliance";
         String complianceBody = "{\"subjectToRegulatoryActions\": false, \"rbiCompliance\": true, \"wilfulDefaulter\": false, \"termsAcknowledged\": true}";
 
