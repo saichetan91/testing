@@ -1,71 +1,44 @@
 package flows;
 
-import common.HeaderHelper;
 import io.restassured.response.Response;
-import org.json.JSONObject;
+
+import common.WalletAPIHelper;
 
 public class WalletAPI {
 
     // GET Wallet Transactions
     public static void getWalletTransactions() {
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .queryParam("type", "CREDIT,DEBIT")
-                .queryParam("state", "INITIATED,SUCCESS,FAILED")
-                .queryParam("pageNo", "0")
-                .queryParam("pageSize", "10")
-                .queryParam("sortByUpdatedAtDesc", "true")
-                .get("https://kraken-stage.tapinvest.in/v2/wallet/transactions");
-
+        Response response = WalletAPIHelper.getWalletTransactions("CREDIT,DEBIT", "INITIATED,SUCCESS,FAILED", 0, 10, true);
         System.out.println("Wallet Transactions Response: " + response.asPrettyString());
     }
 
     // GET Wallet Balance
     public static void getWalletBalance() {
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .get("https://kraken-stage.tapinvest.in/v2/wallet/balance");
-
+        Response response = WalletAPIHelper.getWalletBalance();
         System.out.println("Wallet Balance Response: " + response.asPrettyString());
     }
 
     // GET Buffer Available
     public static void getBufferAvailable(int amount) {
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .queryParam("amount", amount)
-                .get("https://kraken-stage.tapinvest.in/v2/investments/buffer-available");
-
+        Response response = WalletAPIHelper.getBufferAvailable(amount);
         System.out.println("Buffer Available Response: " + response.asPrettyString());
     }
 
     // POST Wallet Recharge
     public static void rechargeWallet(double amount, String paymentMode) {
-        JSONObject payload = new JSONObject();
-        payload.put("amount", amount);
-        payload.put("paymentMode", paymentMode); // e.g., "UPI", "CARD"
-
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .body(payload.toString())
-                .post("https://kraken-stage.tapinvest.in/v2/wallet/recharge");
-
+        Response response = WalletAPIHelper.rechargeWallet(amount, paymentMode);
         System.out.println("Wallet Recharge Response: " + response.asPrettyString());
     }
 
     // GET OTP Request
     public static void requestOTP() {
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .get("https://kraken-stage.tapinvest.in/v2/wallet/otp/request");
-
+        Response response = WalletAPIHelper.requestOTP();
         System.out.println("OTP Request Response: " + response.asPrettyString());
     }
 
     // POST Withdraw Request
     public static void withdrawRequest(double amount) {
-        JSONObject payload = new JSONObject();
-        payload.put("amount", amount);
-
-        Response response = HeaderHelper.getRequestWithHeaders()
-                .body(payload.toString())
-                .post("https://kraken-stage.tapinvest.in/v2/wallet/withdraw-request");
-
+        Response response = WalletAPIHelper.withdrawRequest(amount);
         System.out.println("Withdraw Request Response: " + response.asPrettyString());
     }
 

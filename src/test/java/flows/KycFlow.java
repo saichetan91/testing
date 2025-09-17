@@ -2,15 +2,15 @@
 
 package flows;
 
-import common.HeaderHelper;
-import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.json.JSONObject;
 
 import common.ApiBaseTest;
-import java.util.Random;
 import common.OtpHelper;
+import common.DataGenerator;
+import common.UserProfileAPI;
 
 public class KycFlow extends ApiBaseTest {
 
@@ -22,51 +22,19 @@ public class KycFlow extends ApiBaseTest {
     private final String aadhaarNumber = "212711195196";
     private final String fixedAadhaarOtp = "123456";
 
-    private final String bankAccountNumber = generateEvenBankAccountNumber(15);
-    private final String ifscCode = "SBIN0001234";
-    private final String investingAs = "Individual";
-    private final String netWorth = "Below 50 Lakhs";
-    private final String investmentPlan = "Less than ₹25L";
-
-    private String generateEvenBankAccountNumber(int length) {
-        Random random = new Random();
-        StringBuilder sb = new StringBuilder();
-        // Ensure first digit is non-zero
-        sb.append(random.nextInt(9) + 1);
-        for (int i = 1; i < length - 1; i++) {
-            sb.append(random.nextInt(10));
-        }
-        // Last digit must be even
-        int[] evenDigits = {0, 2, 4, 6, 8};
-        sb.append(evenDigits[random.nextInt(evenDigits.length)]);
-        return sb.toString();
-    }
+    private final String bankAccountNumber = DataGenerator.generateEvenBankAccountNumber(15);
+    private final String ifscCode = DataGenerator.generateMockIfscCode();
 
     @Test(priority = 1, dependsOnGroups = {"signup"})
     public void testUpdateUserProfile() {
-        // Use the dynamic userId from ApiBaseTest
-        String updateProfileUrl = "/v2/user/update-profile";
-        String requestBody = String.format("{\"id\": %d, \"firstName\": \"%s\", \"gender\": \"%s\"}", ApiBaseTest.userId, firstName, gender);
-
-        Response response = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(requestBody)
-                .log().all()
-                .post(updateProfileUrl);
-
+        Response response = UserProfileAPI.updateUserProfile(ApiBaseTest.userId, firstName, gender);
         Assert.assertEquals(response.getStatusCode(), 200, "Profile update failed.");
     }
 
     @Test(priority = 2, dependsOnMethods = {"testUpdateUserProfile"})
     public void testEmailVerification() {
         // Generate a dynamic email from the mobile number to ensure it's unique
-        String testEmail = "testuser" + ApiBaseTest.mobileNumber + "@example.com";
+        String testEmail = DataGenerator.generateTestEmail(ApiBaseTest.mobileNumber);
         Response requestOtpResponse = OtpHelper.requestEmailOtp(testEmail, ApiBaseTest.authToken, ApiBaseTest.tapSessionId, ApiBaseTest.deviceId, ApiBaseTest.tapDshan, ApiBaseTest.sessionCookie, commonHeaders);
         Assert.assertEquals(requestOtpResponse.getStatusCode(), 202, "Email OTP request failed.");
 
@@ -79,58 +47,17 @@ public class KycFlow extends ApiBaseTest {
 
     @Test(priority = 3, dependsOnMethods = {"testEmailVerification"})
     public void testPanVerification() {
-        String verifyPanUrl = "/v2/user/pan/verify";
-        String requestBody = String.format("{\"panNumber\": \"%s\"}", panNumber);
-        Response response = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(requestBody)
-                .log().all()
-                .post(verifyPanUrl);
-
+        Response response = UserProfileAPI.verifyPan(panNumber);
         response.then().log().all();
         Assert.assertEquals(response.getStatusCode(), 200, "PAN verification failed.");
 
-        String submitPanUrl = "/v2/user/pan";
-        String submitBody = String.format("{\"panCardNumber\": \"%s\", \"name\": \"%s\"}", panNumber, panName);
-
-        Response submitResponse = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(submitBody)
-                .log().all()
-                .post(submitPanUrl);
-
+        Response submitResponse = UserProfileAPI.submitPan(panNumber, panName);
         Assert.assertEquals(submitResponse.getStatusCode(), 200, "PAN submission failed.");
     }
 
     @Test(priority = 4, dependsOnMethods = {"testPanVerification"})
     public void testAadhaarVerification() {
-        String requestAadhaarOtpUrl = "/v2/user/aadhaar/verify";
-        String requestBody = String.format("{\"aadhaarNumber\": \"%s\"}", aadhaarNumber);
-
-        Response response = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(requestBody)
-                .log().all()
-                .post(requestAadhaarOtpUrl);
-
+        Response response = UserProfileAPI.requestAadhaarOtp(aadhaarNumber);
         response.then().log().all();
         Assert.assertEquals(response.getStatusCode(), 200, "Aadhaar OTP request failed.");
 
@@ -141,106 +68,31 @@ public class KycFlow extends ApiBaseTest {
     @Test(priority = 5, dependsOnMethods = {"testAadhaarVerification"})
     public void testBankAndAccreditation() {
         // Step 1: Submit Bank Details
-        String bankDetailsUrl = "/v2/user/bank-details";
-        String bankRequestBody = String.format("{\"accountNumber\": \"%s\", \"confirmAccountNumber\": \"%s\", \"ifscCode\": \"%s\"}",
-                bankAccountNumber, bankAccountNumber, ifscCode);
-
-        Response bankResponse = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(bankRequestBody)
-                .log().all()
-                .post(bankDetailsUrl);
-
+        Response bankResponse = UserProfileAPI.submitBankDetails(bankAccountNumber, ifscCode);
         bankResponse.then().log().all();
         Assert.assertEquals(bankResponse.getStatusCode(), 200, "Bank details submission failed.");
 
         // Step 2: Get Accreditation Questions
-        String getAccreditationUrl = "/v2/user/get-accreditation";
-
-        Response getAccreditationResponse = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_READ")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .log().all()
-                .get(getAccreditationUrl);
-
+        Response getAccreditationResponse = UserProfileAPI.getAccreditation();
         getAccreditationResponse.then().log().all();
         Assert.assertEquals(getAccreditationResponse.getStatusCode(), 200, "Get accreditation failed.");
 
-        // Step 3: Mark Accreditation Answers (with exact question/option IDs)
-        String markAnswerUrl = "/v2/user/accreditation/mark-answer";
+        // Step 3: Mark Accreditation Answers
+        JSONObject accreditationAnswers = new JSONObject();
+        accreditationAnswers.put("1", 10);  // Individual
+        accreditationAnswers.put("2", 16);  // Below 50 Lakhs
+        accreditationAnswers.put("3", 19);  // Less than ₹25L
+        accreditationAnswers.put("4", 24);  // No (regulatory actions)
+        accreditationAnswers.put("5", 25);  // Yes (RBI compliance)
+        accreditationAnswers.put("6", 28);  // No (wilful defaulter)
+        accreditationAnswers.put("7", 29);  // Terms acknowledged
 
-        // Based on the API response structure:
-        // Question 1 (Investing as a): Option 10 = "Individual"
-        // Question 2 (Current Liquid Net Worth): Option 16 = "Below 50 Lakhs"
-        // Question 3 (How much do you plan to invest): Option 19 = "Less than ₹25L"
-        // Question 4 (Subject to regulatory actions): Option 24 = "No"
-        // Question 5 (RBI compliance): Option 25 = "Yes"
-        // Question 6 (Wilful defaulter): Option 28 = "No"
-        // Question 7 (Terms acknowledgment): Option 29 = checkbox agreement
-        String markAnswerBody = String.format("{" +
-                "\"userId\": %d," +
-                "\"accreditationAnswers\": {" +
-                "\"1\": 10," +  // Individual
-                "\"2\": 16," +  // Below 50 Lakhs
-                "\"3\": 19," +  // Less than ₹25L
-                "\"4\": 24," +  // No (regulatory actions)
-                "\"5\": 25," +  // Yes (RBI compliance)
-                "\"6\": 28," +  // No (wilful defaulter)
-                "\"7\": 29" +   // Terms acknowledged
-                "}" +
-                "}", ApiBaseTest.userId);
-
-        Response markAnswerResponse = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(markAnswerBody)
-                .log().all()
-                .post(markAnswerUrl);
-
+        Response markAnswerResponse = UserProfileAPI.markAccreditationAnswers(ApiBaseTest.userId, accreditationAnswers);
         markAnswerResponse.then().log().all();
         Assert.assertEquals(markAnswerResponse.getStatusCode(), 200, "Mark accreditation answers failed.");
 
-        // Step 4: Submit Compliance (compliance questions are handled by mark-answer above)
-        String complianceUrl = "/v2/user/compliance";
-
-        // Step 4: Final Compliance Submission (optional - may not be needed since compliance questions are in mark-answer)
-        String complianceUrl1 = "/v2/user/compliance";
-
-        // Basic compliance payload (may not be needed as questions are handled above)
-        String complianceBody = "{" +
-                "\"subjectToRegulatoryActions\": false," +
-                "\"rbiCompliance\": true," +
-                "\"wilfulDefaulter\": false," +
-                "\"termsAcknowledged\": true" +
-                "}";
-
-        Response complianceResponse = RestAssured.given()
-                .headers(commonHeaders)
-                .header("X-Platform-Request", "WEB_WRITE")
-                .header("X-Tap-Auth", ApiBaseTest.authToken)
-                .header("X-Tap-Session", ApiBaseTest.tapSessionId)
-                .header("X-Device-Id", ApiBaseTest.deviceId)
-                .header("X-Tap-Dshan", ApiBaseTest.tapDshan)
-                .cookie("_session", ApiBaseTest.sessionCookie)
-                .body(complianceBody)
-                .log().all()
-                .post(complianceUrl1);
+        // Step 4: Submit Compliance (optional - may not be needed since compliance questions are in mark-answer)
+        Response complianceResponse = UserProfileAPI.submitCompliance(false, true, false, true);
 
         // Don't fail the test if compliance gives non-200, as mark-answer should have handled everything
         if (complianceResponse.getStatusCode() == 200) {

@@ -8,9 +8,6 @@ import java.util.Map;
 
 public class OtpHelper {
 
-    private static final String FIXED_OTP = "1001";
-    private static final String FIXED_AADHAAR_OTP = "123456";
-
     public static Response requestPhoneOtp(String mobileNumber, String countryCode, String deviceId, Map<String, String> headers) {
         String requestBody = String.format("{\"phone\": \"%s\", \"countryCode\": \"%s\"}", mobileNumber, countryCode);
         return RestAssured.given()

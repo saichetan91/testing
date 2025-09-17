@@ -6,19 +6,52 @@ import static io.restassured.RestAssured.given;
 
 public class HeaderHelper {
 
-    // Returns a RequestSpecification with all common headers applied
+    /**
+     * Returns a RequestSpecification with all common headers applied using dynamic session data
+     */
     public static RequestSpecification getRequestWithHeaders() {
-        return given()
-                .header("x-app-id", "ULTRA")
-                .header("x-client-type", "Web Investor App")
-                .header("x-device-id", "bd47c5d5-e498-46e6-8cab-4b1c7daa47f7")
-                .header("x-device-model", "Macintosh")
-                .header("x-device-type", "Desktop")
-                .header("x-os-type", "Mac OS")
-                .header("x-os-version", "10.15.7")
-                .header("x-platform-request", "WEB_READ")
-                .header("x-tap-auth", "c_Jj4pwhROWepUbBnidwK")
-                .header("x-tap-session", "cbdaa2f7-487d-4d4e-ba82-4e2683a20b6a");
+        RequestSpecification spec = given()
+                .headers(ApiBaseTest.commonHeaders);
+
+        // Add authentication headers if available
+        if (ApiBaseTest.authToken != null) {
+            spec = spec.header("X-Tap-Auth", ApiBaseTest.authToken);
+        }
+        if (ApiBaseTest.tapSessionId != null) {
+            spec = spec.header("X-Tap-Session", ApiBaseTest.tapSessionId);
+        }
+        if (ApiBaseTest.deviceId != null) {
+            spec = spec.header("X-Device-Id", ApiBaseTest.deviceId);
+        }
+        if (ApiBaseTest.tapDshan != null) {
+            spec = spec.header("X-Tap-Dshan", ApiBaseTest.tapDshan);
+        }
+        if (ApiBaseTest.sessionCookie != null) {
+            spec = spec.cookie("_session", ApiBaseTest.sessionCookie);
+        }
+
+        return spec;
     }
 
+    /**
+     * Returns a RequestSpecification with common headers and specific platform request type
+     */
+    public static RequestSpecification getRequestWithHeaders(String platformRequest) {
+        return getRequestWithHeaders()
+                .header("X-Platform-Request", platformRequest);
+    }
+
+    /**
+     * Returns a RequestSpecification for authenticated requests (WEB_WRITE)
+     */
+    public static RequestSpecification getAuthenticatedRequest() {
+        return getRequestWithHeaders("WEB_WRITE");
+    }
+
+    /**
+     * Returns a RequestSpecification for read-only requests (WEB_READ)
+     */
+    public static RequestSpecification getReadOnlyRequest() {
+        return getRequestWithHeaders("WEB_READ");
+    }
 }

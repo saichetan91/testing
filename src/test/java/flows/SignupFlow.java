@@ -6,34 +6,25 @@ import io.restassured.response.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.util.Random;
-import java.util.UUID;
 
 import common.ApiBaseTest;
 import common.OtpHelper;
+import common.DataGenerator;
 
 public class SignupFlow extends ApiBaseTest {
 
     private final String countryCode = "+91";
     private final String fixedOtp = "1001";
-
-    private final String testMobileNumber = generateRandomMobileNumber();
+    private final String testMobileNumber = DataGenerator.generateRandomMobileNumber();
 
     private String tapSessionId;
     private String deviceId;
     private String tapDshan;
     private String sessionCookie;
 
-    private String generateRandomMobileNumber() {
-        Random random = new Random();
-        int firstDigit = random.nextInt(4) + 6;
-        String remainingDigits = String.format("%09d", random.nextInt(1_000_000_000));
-        return String.valueOf(firstDigit) + remainingDigits;
-    }
-
     @Test(priority = 1, groups = {"signup"})
     public void testCompleteSignup() {
-        this.deviceId = UUID.randomUUID().toString();
+        this.deviceId = DataGenerator.generateDeviceId();
 
         System.out.println("Generated Mobile Number: " + testMobileNumber);
 
@@ -50,7 +41,7 @@ public class SignupFlow extends ApiBaseTest {
 
         Assert.assertEquals(verifyOtpResponse.getStatusCode(), 200, "OTP verification failed.");
 
-        this.tapAuth = verifyOtpResponse.header("X-Tap-Auth");
+        ApiBaseTest.tapAuth = verifyOtpResponse.header("X-Tap-Auth");
 
         ApiBaseTest.authToken = verifyOtpResponse.jsonPath().getString("token");
         ApiBaseTest.userId = verifyOtpResponse.jsonPath().getInt("userId");
@@ -59,7 +50,6 @@ public class SignupFlow extends ApiBaseTest {
         ApiBaseTest.tapDshan = this.tapDshan;
         ApiBaseTest.sessionCookie = this.sessionCookie;
         ApiBaseTest.mobileNumber = this.testMobileNumber;
-        ApiBaseTest.tapAuth = this.tapAuth;
 
         Assert.assertNotNull(ApiBaseTest.authToken, "Auth token not found.");
         Assert.assertNotNull(ApiBaseTest.userId, "User ID not found.");
